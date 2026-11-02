@@ -36,7 +36,7 @@ def generate_input_file(
     count. `adj_to_light_wall_share` of those are drawn from walls with an
     adjacent light, and the rest from walls without one.
     """
-    walls, lights, constraints = generate_solution(
+    walls, lights, numbered_walls = generate_solution(
         rows, cols, seed, wall_density, numbered_wall_chance, adj_to_light_wall_share
     )
 
@@ -44,9 +44,9 @@ def generate_input_file(
     grid = [[ENCODING["blank"] for _ in range(cols)] for _ in range(rows)]
     for r, c in walls:
         grid[r][c] = ENCODING["gray"]
-    for constraint_key, cells in constraints.items():
+    for numbered_wall_key, cells in numbered_walls.items():
         for r, c in cells:
-            grid[r][c] = ENCODING[constraint_key]
+            grid[r][c] = ENCODING[numbered_wall_key]
 
     # WRITING/PLOTTING
     path = Path(output_path)
@@ -63,7 +63,7 @@ def generate_input_file(
 
     # interactively plot the solution with matplotlib.
     if plot_solution_grid:
-        show_solution_plot(rows, cols, walls, lights, constraints)
+        show_solution_plot(rows, cols, walls, lights, numbered_walls)
 
     return grid
 
