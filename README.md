@@ -15,8 +15,8 @@ has at least one valid solution:
 2. Lights: open cells are visited in random order, and a light is placed on each
    cell that is still unlit. No two lights can see each other, and every open cell
    ends up lit.
-3. Constraints: a `--numbered_wall_chance` fraction of the walls are numbered with
-   their count of adjacent lights. About 80% of these are walls that touch a light,
+3. Numbered Walls: a `--numbered_wall_chance` fraction of the walls are numbered with
+   their count of required adjacent lights. About 80% of these are walls that touch a light,
    and the rest are walls that don't (shown as `0`).
 
 
