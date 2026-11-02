@@ -13,26 +13,75 @@ const static string SKIP_CHARACTERS = "X01234";
 const static int di[4] = {-1, 1, 0, 0};
 const static int dj[4] = {0, 0, -1, 1};
 
+/*
+================== USAGE =====================
+Compile file: g++ -o verifier verifier.cpp
+
+Check the board:    ./verifier input_file
+Check the solution: ./verifier input_file output_file
+*/
+
 int main(int argc, char* argv[]) {
-    //================================= OPEN FILES ====================================//
-    if (argc != 3) {
-        std::cerr << "ERROR: the format is './verifier [input_file] [output_file]'\n";
+    //================================= OPEN INPUT FILE ====================================//
+    if (argc != 3 && argc != 2) {
+        std::cerr << "ERROR: the format is './verifier input_file [output_file]'\n";
         return 1;
     }
     ifstream board_file(argv[1]);
-    ifstream solution_file(argv[2]);
-    if (!board_file || !solution_file) {
-        std::cerr << "Error: Could not open input or output file!\n";
-        return 1; 
+    if (!board_file.is_open()) {
+        std::cerr << "Error: Could not open input file!\n";
+        return 1;
     }
 
-    //================================== READ FILES ====================================//
+    //================================== READ INPUT FILE ====================================//
     int r = -1, c = -1;                     // Number of rows and columns
     board_file >> r >> c;
     if (!board_file || r <= 0 || c <= 0 || (long long)r * c > 100000) {
         std::cerr << "Error: number of rows or columns were passed incorrectly (need 1 <= r * c <= 10^5)\n";
         return 1;
     }
+
+    vector<string> board(r);
+    // Read all rows
+    for (int i = 0; i < r; i++) {
+        // Read board line
+        board_file >> board[i];
+        // Find its length
+        int board_len = board[i].size();
+        if (board_len != c) {
+            std::cerr << "Error: input file row " << i + 1 << " has ";
+            std::cerr << board_len << " character(s), while it should have " << c << endl;
+            return 1;
+        }
+        // Check boards content
+        for (int j = 0; j < c; j++) {
+            if (BOARD_CHARACTERS.find(board[i][j]) == std::string::npos) {
+                std::cerr << "Error: input file cell (" << i + 1 << ", " << j + 1 << ") has value " << board[i][j] << ", but availible characters are '0', '1', '2', '3', '4', 'X', '.'" << endl;
+                return 1;
+            }
+        }
+    }
+    // Nothing else may follow the grid in the input file
+    string extra;
+    if (board_file >> extra) {
+        std::cerr << "Error: input file has extra content after row " << r << endl;
+        return 1;
+    }
+
+    // Only the board was requested, so we are done
+    if (argc == 2) {
+        std::cout << "INPUT is good\n";
+        return 0;
+    }
+
+    //================================= OPEN OUTPUT FILE ===================================//
+    ifstream solution_file(argv[2]);
+    if (!solution_file.is_open()) {
+        std::cerr << "Error: Could not open output file!\n";
+        return 1;
+    }
+
+    //================================= READ OUTPUT FILE ===================================//
     int violation = 0;
     if (!(solution_file >> violation) || violation < 0) {
         std::cerr << "Error: first line of the output must be a non-negative number of violations\n";
@@ -40,30 +89,23 @@ int main(int argc, char* argv[]) {
     }
     const int reported = violation;
 
-    vector<string> board(r);        
     vector<string> solution(r);
     // Read all rows
     for (int i = 0; i < r; i++) {
-        // Read board and solution line
-        board_file >> board[i];
+        // Read solution line
         solution_file >> solution[i];
-        // Find their lengths
-        int board_len = board[i].size();
+        // Find its length
         int solution_len = solution[i].size();
-        if (board_len != c || solution_len != c) {
-            std::cerr << "Error: row " << i + 1 << " has ";
-            std::cerr << (board_len != c ? board_len : solution_len) << " character(s), while it should have " << c << endl; 
-            return 1; 
+        if (solution_len != c) {
+            std::cerr << "Error: output file row " << i + 1 << " has ";
+            std::cerr << solution_len << " character(s), while it should have " << c << endl;
+            return 1;
         }
-        // Check boards content
+        // Check solutions content
         for (int j = 0; j < c; j++) {
-            if (BOARD_CHARACTERS.find(board[i][j]) == std::string::npos) {
-                std::cerr << "Error: cell (" << i + 1 << ", " << j + 1 << ") has value " << board[i][j] << ", but availible characters are '0', '1', '2', '3', '4', 'X', '.'" << endl;
-                return 1; 
-            }
             if (SOLUTION_CHARACTERS.find(solution[i][j]) == std::string::npos) {
-                std::cerr << "Error: cell (" << i + 1 << ", " << j + 1 << ") has value " << solution[i][j] << ", but availible characters are '0', '1', '2', '3', '4', 'X', '.', 'L'" << endl;
-                return 1; 
+                std::cerr << "Error: output file cell (" << i + 1 << ", " << j + 1 << ") has value " << solution[i][j] << ", but availible characters are '0', '1', '2', '3', '4', 'X', '.', 'L'" << endl;
+                return 1;
             }
             if (board[i][j] == solution[i][j]) continue;
             if (board[i][j] != '.' || solution[i][j] != 'L') {
@@ -73,13 +115,15 @@ int main(int argc, char* argv[]) {
             }
         }
     }
+
     // Nothing else may follow the grid in the output file
-    string extra;
+    extra = "";
     if (solution_file >> extra) {
         std::cerr << "Error: output file has extra content after row " << r << endl;
         return 1;
     }
 
+    //================================= CHECK THE SOLUTION =================================//
     vector<vector<bool>> violations(r, vector<bool>(c, false));
     vector<vector<bool>> illuminated(r, vector<bool>(c, false));
     // Check rows
