@@ -4,6 +4,7 @@ The solution is built first (walls, then lights, then numbered numbered_walls th
 match those lights), and the input file is that solution with the lights removed.
 """
 
+import math
 import random
 from pathlib import Path
 
@@ -15,8 +16,8 @@ Cell = tuple[int, int]  # (row, col)
 # orthogonal unit directions from the current cell.
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
-# Share of numbered walls drawn from walls with an adjacent light.
-ADJ_TO_LIGHT_WALL_SHARE = 0.8
+# Share of numbered walls showing each number 0-4. Must sum to 1.
+NUMBERED_WALL_DENSITIES = (0.2, 0.53, 0.21, 0.05, 0.01)
 
 
 def generate_input_file(
@@ -27,17 +28,16 @@ def generate_input_file(
     plot_solution_grid: bool = False,
     wall_density: float = 0.3,
     numbered_wall_chance: float = 0.7,
-    adj_to_light_wall_share: float = ADJ_TO_LIGHT_WALL_SHARE,
+    numbered_wall_densities: tuple[float, ...] = NUMBERED_WALL_DENSITIES,
 ) -> list[list[str]]:
     """Write a generated puzzle to `output_path` and return its character grid.
 
     A directory or a path ending in "/" receives a file named input.txt.
     `numbered_wall_chance` is the fraction of walls that show their adjacent light
-    count. `adj_to_light_wall_share` of those are drawn from walls with an
-    adjacent light, and the rest from walls without one.
+    count. `numbered_wall_densities[n]` is the share of those that show n.
     """
     walls, lights, numbered_walls = generate_solution(
-        rows, cols, seed, wall_density, numbered_wall_chance, adj_to_light_wall_share
+        rows, cols, seed, wall_density, numbered_wall_chance, numbered_wall_densities
     )
 
     # lights are left out of the input grid
@@ -74,14 +74,14 @@ def generate_solution(
     seed: int,
     wall_density: float,
     numbered_wall_chance: float,
-    adj_to_light_wall_share: float = ADJ_TO_LIGHT_WALL_SHARE,
+    numbered_wall_densities: tuple[float, ...] = NUMBERED_WALL_DENSITIES,
 ) -> tuple[set[Cell], set[Cell], dict[str, set[Cell]]]:
     """Return (unnumbered walls, lights, numbered walls have key "gray_<n>" with n in 0-4)."""
     random.seed(seed)
 
     walls = generate_walls(rows, cols, density=wall_density)
     lights = generate_lights(rows, cols, walls)
-    numbered_walls = generate_numbered_walls(walls, lights, numbered_wall_chance, adj_to_light_wall_share)
+    numbered_walls = generate_numbered_walls(walls, lights, numbered_wall_chance, numbered_wall_densities)
 
     # Remove any blank walls that became numbered in generate_numbered_walls()
     walls -= set().union(*numbered_walls.values()) # need to union to merge all "gray_X" sets into one
@@ -129,40 +129,39 @@ def generate_numbered_walls(
     walls: set[Cell],
     lights: set[Cell],
     numbered_wall_chance: float,
-    adj_to_light_wall_share: float = ADJ_TO_LIGHT_WALL_SHARE,
+    numbered_wall_densities: tuple[float, ...] = NUMBERED_WALL_DENSITIES,
 ) -> dict[str, set[Cell]]:
     """Number some walls with their adjacent light count (0-4), keyed by "gray_<n>".
 
-    `numbered_wall_chance` of the walls are numbered: `adj_to_light_wall_share` of those
-    have an adjacent light and the rest have none.
+    `numbered_wall_chance` of the walls are numbered, and `numbered_wall_densities[n]`
+    of those show n.
     """
+    if len(numbered_wall_densities) != 5 or min(numbered_wall_densities) < 0:
+        raise ValueError("numbered_wall_densities needs five non-negative values, one per number 0-4")
+    if not math.isclose(sum(numbered_wall_densities), 1.0):
+        raise ValueError(f"numbered_wall_densities must sum to 1, got {sum(numbered_wall_densities)}")
+
     # each item in the dictionary is a set corresponding to "gray_0"-"gray_4" numbered_wall cells
-    numbered_walls: dict[str, set[Cell]] = {f"gray_{n}": set() for n in range(5)}
+    numbered_walls: dict[str, set[Cell]] = {}
 
-    walls_adj_to_light: set[Cell] # walls that are orthogonally adjacent to a light.
-    walls_not_adj_to_light: set[Cell] # walls that are not orthogonally adjacent to a light
-    
-    # Will be replaced with numbered_wall from 1-4 (the required number of adjacent lights)
-    walls_adj_to_light = sorted(
-        (r, c) for r, c in walls if not orthogonal_neighbors(r, c).isdisjoint(lights)
-    )
-    # Will be replaced with numbered_wall 0 (no light can be placed adjacent to it)
-    walls_not_adj_to_light = sorted(walls.difference(walls_adj_to_light))
+    # walls_by_count[n] holds the walls with exactly n adjacent lights, the only walls that can show n
+    walls_by_count: dict[int, list[Cell]] = {}
+    for n in range(5):
+        numbered_walls[f"gray_{n}"] = set()
+        walls_by_count[n] = []
 
-    # Determine the number of walls to be converted to numbered_walls based on the input probabilities
-    # numbered_wall_chance: the probability that blank walls will be converted to numbered walls (numbered_walls)
-    # adj_to_light_wall_share: the probability that converted walls are adjacent to lights
+    for r, c in sorted(walls):
+        adjacent_lights = len(orthogonal_neighbors(r, c) & lights) # determines the # of adjacent lights at this wall.
+        walls_by_count[adjacent_lights].append((r, c))
+
+    # Determine the number of walls to be converted to numbered_walls
     numbered_count = round(numbered_wall_chance * len(walls))
-    adj_count = min(round(adj_to_light_wall_share * numbered_count), len(walls_adj_to_light))
-    not_adj_count = min(numbered_count - adj_count, len(walls_not_adj_to_light))
-    adj_count = numbered_count - not_adj_count
 
-    # randomly sample a wall from either set & add numbered_walls.
-    for r, c in random.sample(walls_adj_to_light, adj_count) + random.sample(
-        walls_not_adj_to_light, not_adj_count
-    ):
-        adjacent_lights = len(orthogonal_neighbors(r, c) & lights)
-        numbered_walls[f"gray_{adjacent_lights}"].add((r, c))
+    # Give each number its share of the numbered walls, capped at the walls that can show it
+    for n in range(5):
+        count = round(numbered_wall_densities[n] * numbered_count)
+        count = min(count, len(walls_by_count[n]))
+        numbered_walls[f"gray_{n}"] = set(random.sample(walls_by_count[n], count))
 
     return numbered_walls
 
