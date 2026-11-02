@@ -1,6 +1,6 @@
 """Generate puzzle input files that are guaranteed to have a valid solution.
 
-The solution is built first (walls, then lights, then numbered constraints that
+The solution is built first (walls, then lights, then numbered numbered_walls that
 match those lights), and the input file is that solution with the lights removed.
 """
 
@@ -81,12 +81,12 @@ def generate_solution(
 
     walls = generate_walls(rows, cols, density=wall_density)
     lights = generate_lights(rows, cols, walls)
-    constraints = generate_numbered_walls(walls, lights, numbered_wall_chance, adj_to_light_wall_share)
+    numbered_walls = generate_numbered_walls(walls, lights, numbered_wall_chance, adj_to_light_wall_share)
 
-    # Remove any blank walls that became numbered in generate_constraints()
-    walls -= set().union(*constraints.values()) # need to union to merge all "gray_X" sets into one
+    # Remove any blank walls that became numbered in generate_numbered_walls()
+    walls -= set().union(*numbered_walls.values()) # need to union to merge all "gray_X" sets into one
 
-    return walls, lights, constraints
+    return walls, lights, numbered_walls
 
 
 def generate_light(rows: int, cols: int) -> Cell:
@@ -136,28 +136,28 @@ def generate_numbered_walls(
     `numbered_wall_chance` of the walls are numbered: `adj_to_light_wall_share` of those
     have an adjacent light and the rest have none.
     """
-    # each item in the dictionary is a set corresponding to "gray_0"-"gray_4" constraint cells
+    # each item in the dictionary is a set corresponding to "gray_0"-"gray_4" numbered_wall cells
     numbered_walls: dict[str, set[Cell]] = {f"gray_{n}": set() for n in range(5)}
 
     walls_adj_to_light: set[Cell] # walls that are orthogonally adjacent to a light.
     walls_not_adj_to_light: set[Cell] # walls that are not orthogonally adjacent to a light
     
-    # Will be replaced with constraints from 1-4 (the required number of adjacent lights)
+    # Will be replaced with numbered_wall from 1-4 (the required number of adjacent lights)
     walls_adj_to_light = sorted(
         (r, c) for r, c in walls if not orthogonal_neighbors(r, c).isdisjoint(lights)
     )
-    # Will be replaced with constraint 0 (no light can be placed adjacent to it)
+    # Will be replaced with numbered_wall 0 (no light can be placed adjacent to it)
     walls_not_adj_to_light = sorted(walls.difference(walls_adj_to_light))
 
-    # Determine the number of walls to be converted to constraints based on the input probabilities
-    # numbered_wall_chance: the probability that blank walls will be converted to numbered walls (constraints)
+    # Determine the number of walls to be converted to numbered_walls based on the input probabilities
+    # numbered_wall_chance: the probability that blank walls will be converted to numbered walls (numbered_walls)
     # adj_to_light_wall_share: the probability that converted walls are adjacent to lights
     numbered_count = round(numbered_wall_chance * len(walls))
     adj_count = min(round(adj_to_light_wall_share * numbered_count), len(walls_adj_to_light))
     not_adj_count = min(numbered_count - adj_count, len(walls_not_adj_to_light))
     adj_count = numbered_count - not_adj_count
 
-    # randomly sample a wall from either set & add constraints.
+    # randomly sample a wall from either set & add numbered_walls.
     for r, c in random.sample(walls_adj_to_light, adj_count) + random.sample(
         walls_not_adj_to_light, not_adj_count
     ):
