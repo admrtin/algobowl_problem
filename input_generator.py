@@ -10,8 +10,9 @@ parser.add_argument("--output_path", type=str, default = "out/")
 parser.add_argument("--plot_solution_grid", action="store_true")
 parser.add_argument("--wall_density", type=float, default=0.3)
 parser.add_argument("--numbered_wall_chance", type=float, default=0.7)
+parser.add_argument("--adj_to_light_wall_share", type=float, default=0.8)
 args = parser.parse_args()
 
 
 if __name__ == "__main__":
-    generate_input_file(args.rows, args.cols, args.seed, args.output_path, args.plot_solution_grid, args.wall_density, args.numbered_wall_chance)
+    generate_input_file(args.rows, args.cols, args.seed, args.output_path, args.plot_solution_grid, args.wall_density, args.numbered_wall_chance, args.adj_to_light_wall_share)

@@ -37,6 +37,7 @@ Defaults are set so you don't have to specify certain arguments:
 | `--output_path`          | `out/`  | Output file, or a directory to receive `input.txt`.          |
 | `--wall_density`         | `0.3`   | Probability from 0 to 1 that a cell is a wall.               |
 | `--numbered_wall_chance` | `0.7`   | Fraction of walls, from 0 to 1, that are numbered.           |
+| `--adj_to_light_wall_share`       | `0.8`   | Fraction of numbered walls drawn from walls that touch a light. The rest show `0`. |
 | `--plot_solution_grid`   | off     | Display the generated solution to the input file in an interactive plot.       |
 
 
