@@ -39,19 +39,19 @@ def plot_solution_grid(
     cols: int,
     walls: set[tuple[int, int]],
     lights: set[tuple[int, int]],
-    constraints: dict[str, set[tuple[int, int]]]
+    numbered_walls: dict[str, set[tuple[int, int]]]
     ,
 ):
-    # constraints[n] holds the (row, col) cells of gray_n; walls holds unnumbered gray cells.
+    # numbered_walls[n] holds the (row, col) cells of gray_n; walls holds unnumbered gray cells.
     image = np.empty((rows, cols, 3))
     image[:, :] = to_rgb(COLORS["blank"])
     for r, c in walls or ():
         image[r, c] = to_rgb(COLORS["gray"])
-    for key, cells in constraints.items():
+    for key, cells in numbered_walls.items():
         for r, c in cells:
             image[r, c] = to_rgb(COLORS[key])
     blockers = set(walls or ())
-    for cells in constraints.values():
+    for cells in numbered_walls.values():
         blockers.update(cells)
     for r0, c0 in lights:
         for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
@@ -67,7 +67,7 @@ def plot_solution_grid(
 
     # One marker layer per glyph draws far faster than one ax.text per cell.
     glyph_layers = [_add_glyph_layer(ax, lights, ENCODING["light"], "black")]
-    for key, cells in constraints.items():
+    for key, cells in numbered_walls.items():
         glyph_layers.append(_add_glyph_layer(ax, cells, ENCODING[key], "white"))
 
     grid_lines = LineCollection(
