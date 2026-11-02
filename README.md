@@ -46,6 +46,7 @@ Defaults are set so you don't have to specify certain arguments:
 | `--numbered_wall_3_density` | `0.05` | Share of numbered walls that require `3` adjacent lights. |
 | `--numbered_wall_4_density` | `0.01` | Share of numbered walls that require `4` adjacent lights. |
 | `--plot_solution_grid`   | off     | Display the generated solution to the input file in an interactive plot.       |
+| `--plot_input_grid`      | off     | Display the generated input file in an interactive plot.       |
 
 
 # Solve an input file

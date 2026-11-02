@@ -9,6 +9,7 @@ parser.add_argument("--cols", type=int, default=316)
 parser.add_argument("--seed", type=int, default=1234)
 parser.add_argument("--output_path", type=str, default = "out/")
 parser.add_argument("--plot_solution_grid", action="store_true")
+parser.add_argument("--plot_input_grid", action="store_true")
 parser.add_argument("--wall_density", type=float, default=0.3)
 parser.add_argument("--numbered_wall_chance", type=float, default=0.7)
 for n, density in enumerate(NUMBERED_WALL_DENSITIES):
@@ -21,4 +22,4 @@ if not math.isclose(sum(numbered_wall_densities), 1.0, abs_tol=1e-6):
 
 
 if __name__ == "__main__":
-    generate_input_file(args.rows, args.cols, args.seed, args.output_path, args.plot_solution_grid, args.wall_density, args.numbered_wall_chance, numbered_wall_densities)
+    generate_input_file(args.rows, args.cols, args.seed, args.output_path, args.plot_solution_grid, args.wall_density, args.numbered_wall_chance, numbered_wall_densities, args.plot_input_grid)

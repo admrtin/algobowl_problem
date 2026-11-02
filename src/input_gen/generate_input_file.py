@@ -8,8 +8,7 @@ import math
 import random
 from pathlib import Path
 
-from ..plot.plot_solution_grid import ENCODING
-from ..plot.plot_solution_grid import plot_solution_grid as show_solution_plot
+from ..plot.plot_grid import ENCODING, plot_grid
 
 Cell = tuple[int, int]  # (row, col)
 
@@ -29,6 +28,7 @@ def generate_input_file(
     wall_density: float = 0.3,
     numbered_wall_chance: float = 0.7,
     numbered_wall_densities: tuple[float, ...] = NUMBERED_WALL_DENSITIES,
+    plot_input_grid: bool = False,
 ) -> list[list[str]]:
     """Write a generated puzzle to `output_path` and return its character grid.
 
@@ -61,9 +61,11 @@ def generate_input_file(
         for row in grid:
             file.write("".join(row) + "\n")
 
-    # interactively plot the solution with matplotlib.
+    # interactively plot the input and/or solution with matplotlib.
+    if plot_input_grid:
+        plot_grid(rows, cols, walls, lights, numbered_walls, is_input=True)
     if plot_solution_grid:
-        show_solution_plot(rows, cols, walls, lights, numbered_walls)
+        plot_grid(rows, cols, walls, lights, numbered_walls)
 
     return grid
 
