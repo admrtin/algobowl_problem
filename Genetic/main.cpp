@@ -18,6 +18,6 @@ int main(int argc, char* argv[]) {
     std::cout << "read akari input file at " << input_path << "\n";
     std::cout << "num_rows: " << problem.num_rows << "\tnum_cols: " << problem.num_cols << "\n";
 
-    // generate an initial solution population
-    
+    // build the gene map for this problem
+    GeneMap map = make_gene_map(problem);
 }
