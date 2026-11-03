@@ -37,6 +37,30 @@ void mutate_individual(Individual& individual, std::mt19937& rng) {
     individual.genes.at(distribution(rng)) ^= 1; // bit flip if the int is 0/1
 }
 
-std::pair<Individual, Individual> make_children(std::pair<Individual, Individual> parents) {
-    
+std::pair<Individual, Individual> make_children(const std::pair<Individual, Individual>& parents, std::mt19937& rng) {
+    const Individual parent_1 = parents.first;
+    const Individual parent_2 = parents.second;
+    const size_t n = parent_1.genes.size();
+
+    std::uniform_int_distribution<size_t> distribution(0, n - 1);
+    size_t crossover_index = distribution(rng);
+    size_t split = crossover_index + 1; // [0, split) from one parent, [split, n) from the other
+
+    Individual child_1;
+    Individual child_2;
+    child_1.fitness=0;
+    child_2.fitness=0;
+    child_1.genes.reserve(n);
+    child_2.genes.reserve(n);
+
+    // child 1: parent_1.genes[0 : crossover_index+1] + parent_2.genes[crossover_index+1 : n]
+    child_1.genes.insert(child_1.genes.end(), parent_1.genes.begin(), parent_1.genes.begin() + split);
+    child_1.genes.insert(child_1.genes.end(), parent_2.genes.begin() + split, parent_2.genes.end());
+
+    // child 2: parent_2.genes[0 : crossover_index+1] + parent_1.genes[crossover_index+1 : n]
+    child_2.genes.insert(child_2.genes.end(), parent_2.genes.begin(), parent_2.genes.begin() + split);
+    child_2.genes.insert(child_2.genes.end(), parent_1.genes.begin() + split, parent_1.genes.end());
+
+    return {child_1, child_2};
 }
+

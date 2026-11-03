@@ -28,7 +28,7 @@ Individual make_individual(const GeneMap& map, std::mt19937& rng);
 void mutate_individual(Individual& individual, std::mt19937& rng);
 
 // make two children from two parents
-std::pair<Individual, Individual> make_children(std::pair<Individual, Individual> parents);
+std::pair<Individual, Individual> make_children(const std::pair<Individual, Individual>& parents, std::mt19937& rng);
 
 // fitness function to determine new population
 int compute_fitness(Individual individual, const Problem& problem, const GeneMap& map);
