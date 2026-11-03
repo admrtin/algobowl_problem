@@ -24,8 +24,8 @@ struct Population {
 // initializer
 Individual make_individual(const GeneMap& map, std::mt19937& rng);
 
-// mutate the individuals genes
-Individual mutate_individual(Individual individual, std::mt19937& rng);
+// mutate an individual's genes
+void mutate_individual(Individual& individual, std::mt19937& rng);
 
 // make two children from two parents
 std::pair<Individual, Individual> make_children(std::pair<Individual, Individual> parents);
