@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include "akari_io.h"
+#include "genetic.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
