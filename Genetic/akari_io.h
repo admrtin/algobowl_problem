@@ -19,6 +19,6 @@ struct Solution {
 // reads an input file into board, returns false (with a message on stderr) if the file is malformed
 bool read_input(const char* input_file, Problem& board);
 // writes the violation count followed by the solution grid, returns false if the file can't be opened
-bool write_output(const char* output_file, const Solution& solution, int violations);
+bool write_output(const char* output_file, const Solution& solution);
 
 #endif
