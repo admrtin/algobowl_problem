@@ -16,12 +16,12 @@ Define vn = # new violations, vo = # old violations and Δ = vo - vn.
 
 If 
     Δ >= 0 apply the change
-    Δ < 0 apply with probability e^(-Δ / T), where T is the current interation
+    Δ < 0 apply with probability e^(Δ/T), where T is the current term in geometric series
 
 Part 3. Large Neighborhood Search (LNS). Local search over the window. 
 
 Consider each violation at a cell. Try to fix it using nxn windows.
 - Start with n = 3
 - For current n, run dfs recursive calls the check all toggles.
-- If the number of violations in the square is worse then at the start, abandon 
-- Increase by 2 as needed. Keep max of n. Max tree depth as well.
+- If the number of violations in the square is not better then at the start, abandon 
+- Increase by 2 as needed. Keep max of n. Max visited number of nodes.

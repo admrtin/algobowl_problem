@@ -1,0 +1,18 @@
+17 17
+XXXXXXX.X.X.3.2.X
+X.....X......2.1X
+X.XX1.X...1..X..X
+1.XXX.X.....1.1.X
+X.XXX.X.1.X.....X
+X.....X..XX..X...
+XXXXX1X..2.2X1...
+.........X2.....X
+X.X..2.1.XX1XX..X
+.3X...X.1.X..1.X.
+X.XX.12.XX.X2X.XX
+.XXX.X.XX.X..1X.X
+2X....1X1.1XX...2
+..XX1XX.X....X...
+3.X...X.1XX....1.
+.X.2XX1.XX..1X...
+XX..1...X1..X...X
