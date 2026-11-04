@@ -9,17 +9,20 @@ the first time it runs, so there is no separate install step.
 
 # Input
 
+## Workflow: 
+
 The generator builds a solved puzzle and then removes the lights, so every input
 has at least one valid solution:
 1. Walls: each cell independently becomes a wall with probability `--wall_density`.
 2. Lights: open cells are visited in random order, and a light is placed on each
    cell that is still unlit. No two lights can see each other, and every open cell
    ends up lit.
-3. Numbered Walls: a `--numbered_wall_chance` fraction of the walls are numbered with
-   their count of required adjacent lights. About 80% of these are walls that touch a light,
-   and the rest are walls that don't (shown as `0`).
-
-
+3. Numbered walls: a `--numbered_wall_chance` fraction of the walls are numbered with
+   their count of adjacent lights. `--numbered_wall_<n>_density` sets the share of
+   numbered walls that show `n`. If too few walls touch exactly `n` lights, the
+   remainder goes to the other numbers.
+4. Light removal: Once walls and numbered walls are placed, lights are removed from
+   the solution to produce the input. At this point, the input file is written to disk.
 
 ## Generate an input file
 
@@ -37,13 +40,13 @@ Defaults are set so you don't have to specify certain arguments:
 | `--output_path`          | `out/`  | Output file, or a directory to receive `input.txt`.          |
 | `--wall_density`         | `0.3`   | Probability from 0 to 1 that a cell is a wall.               |
 | `--numbered_wall_chance` | `0.7`   | Fraction of walls, from 0 to 1, that are numbered.           |
-| `--adj_to_light_wall_share`       | `0.8`   | Fraction of numbered walls drawn from walls that touch a light. The rest show `0`. |
+| `--numbered_wall_0_density` | `0.2` | Share of numbered walls that require `0` adjacent lights. The five densities must sum to 1. |
+| `--numbered_wall_1_density` | `0.53` | Share of numbered walls that require `1` adjacent light. |
+| `--numbered_wall_2_density` | `0.21` | Share of numbered walls that require `2` adjacent lights. |
+| `--numbered_wall_3_density` | `0.05` | Share of numbered walls that require `3` adjacent lights. |
+| `--numbered_wall_4_density` | `0.01` | Share of numbered walls that require `4` adjacent lights. |
 | `--plot_solution_grid`   | off     | Display the generated solution to the input file in an interactive plot.       |
-
-
-In the plot, bulbs are bright yellow, illuminated blank cells are pale yellow, and
-unlit blank cells are white. Walls and numbered cells block light. You may need to
-zoom in or expand the plot to see the text in the cells.
+| `--plot_input_grid`      | off     | Display the generated input file in an interactive plot.       |
 
 
 # Solve an input file

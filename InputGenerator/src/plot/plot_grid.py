@@ -34,15 +34,18 @@ MIN_GRID_CELL_PIXELS: float = 4
 GLYPH_CELL_FRACTION: float = 0.7
 
 
-def plot_solution_grid(
+def plot_grid(
     rows: int,
     cols: int,
     walls: set[tuple[int, int]],
     lights: set[tuple[int, int]],
-    numbered_walls: dict[str, set[tuple[int, int]]]
-    ,
+    numbered_walls: dict[str, set[tuple[int, int]]],
+    is_input: bool = False,
 ):
     # numbered_walls[n] holds the (row, col) cells of gray_n; walls holds unnumbered gray cells.
+    # The input grid is the solution without its lights.
+    if is_input:
+        lights = set()
     image = np.empty((rows, cols, 3))
     image[:, :] = to_rgb(COLORS["blank"])
     for r, c in walls or ():
@@ -63,10 +66,13 @@ def plot_solution_grid(
         image[r, c] = to_rgb(COLORS["light"])
 
     fig, ax = plt.subplots()
+    ax.set_title("Input" if is_input else "Solution")
     ax.imshow(image, interpolation="nearest")
 
     # One marker layer per glyph draws far faster than one ax.text per cell.
-    glyph_layers = [_add_glyph_layer(ax, lights, ENCODING["light"], "black")]
+    glyph_layers = []
+    if lights:
+        glyph_layers.append(_add_glyph_layer(ax, lights, ENCODING["light"], "black"))
     for key, cells in numbered_walls.items():
         glyph_layers.append(_add_glyph_layer(ax, cells, ENCODING[key], "white"))
 
