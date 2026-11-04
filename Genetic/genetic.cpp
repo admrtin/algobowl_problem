@@ -9,9 +9,10 @@ Individual make_individual(const GeneMap& map, std::mt19937& rng, double bulb_pr
     individual.fitness = 0; // initialize fitness to 0
 
     std::bernoulli_distribution distribution(bulb_probability);
-
+    
     for (size_t i = 0; i < map.cell_map.size(); i++) {
-        individual.genes.push_back(distribution(rng)); // assigns 0 or 1 randomly at this cell location.
+        if (map.fixed[i] != GeneMap::FREE) individual.genes.push_back(map.fixed[i]); // the walls decide this one
+        else individual.genes.push_back(distribution(rng)); // assigns 0 or 1 randomly at this cell location.
     }
 
     repair_individual(individual, map, rng); // start fully lit
@@ -22,14 +23,26 @@ Individual make_individual(const GeneMap& map, std::mt19937& rng, double bulb_pr
 void repair_individual(Individual& individual, const GeneMap& map, std::mt19937& rng) {
     const size_t num_genes = individual.genes.size();
 
-    // count the bulbs in every row and column segment.
+    // count the bulbs in every row and column segment, and next to every numbered wall.
     std::vector<int> bulbs_in_segment(map.num_segments, 0);
+    std::vector<int> bulbs_at_wall(map.numbered_walls.size(), 0);
     for (size_t gene = 0; gene < num_genes; gene++) {
         if (individual.genes[gene]) {
             bulbs_in_segment[map.row_segment[gene]]++;
             bulbs_in_segment[map.col_segment[gene]]++;
+            for (int w : map.gene_walls[gene]) bulbs_at_wall[w]++;
         }
     }
+
+    // how much worse a bulb at this gene makes the numbered walls (negative = it helps).
+    // FORBIDDEN cells cost more than any wall effect so they're only used when nothing else can light the cell.
+    auto placement_cost = [&](int gene) {
+        int cost = (map.fixed[gene] == GeneMap::FORBIDDEN) ? 100 : 0;
+        for (int w : map.gene_walls[gene]) {
+            cost += (bulbs_at_wall[w] < map.numbered_walls[w].required) ? -1 : 1;
+        }
+        return cost;
+    };
 
     // visit cells in random order so repeated repairs don't all favor the top-left of the grid.
     std::vector<int> order(num_genes);
@@ -37,15 +50,73 @@ void repair_individual(Individual& individual, const GeneMap& map, std::mt19937&
     std::shuffle(order.begin(), order.end(), rng);
 
     for (int gene : order) {
-        int& row_bulbs = bulbs_in_segment[map.row_segment[gene]];
-        int& col_bulbs = bulbs_in_segment[map.col_segment[gene]];
+        if (bulbs_in_segment[map.row_segment[gene]] || bulbs_in_segment[map.col_segment[gene]]) continue; // lit
 
-        if (row_bulbs == 0 && col_bulbs == 0) {
-            // unlit. both its segments are empty, so a bulb here can't see any other bulb.
-            // it also lights its whole row and column segment, which may fix other unlit cells.
-            individual.genes[gene] = 1;
-            row_bulbs++;
-            col_bulbs++;
+        // unlit. any cell in its row or column segment with both segments empty can light it
+        // without seeing another bulb (the cell itself always qualifies). pick the cheapest, ties at random.
+        int best = gene;
+        int best_cost = placement_cost(gene);
+        int ties = 1;
+        for (int segment : {map.row_segment[gene], map.col_segment[gene]}) {
+            for (int candidate : map.segment_cells[segment]) {
+                if (candidate == gene) continue;
+                if (bulbs_in_segment[map.row_segment[candidate]] || bulbs_in_segment[map.col_segment[candidate]]) continue;
+                int cost = placement_cost(candidate);
+                if (cost < best_cost) {
+                    best = candidate; best_cost = cost; ties = 1;
+                } else if (cost == best_cost && std::uniform_int_distribution<int>(0, ties++)(rng) == 0) {
+                    best = candidate; // reservoir sampling keeps the tie-break uniform
+                }
+            }
+        }
+
+        individual.genes[best] = 1;
+        bulbs_in_segment[map.row_segment[best]]++;
+        bulbs_in_segment[map.col_segment[best]]++;
+        for (int w : map.gene_walls[best]) bulbs_at_wall[w]++;
+    }
+}
+
+// decide the genes the numbered walls leave no choice about, repeating until nothing changes:
+//  - a wall that already has `required` FORCED neighbors forbids its other FREE neighbors (this covers '0' walls)
+//  - a wall whose FORCED + FREE neighbors only just reach `required` forces all its FREE neighbors
+//  - a FORCED bulb forbids every FREE cell in its row and column segments (they would see it)
+// these only follow from the rules, so a solvable puzzle keeps its solutions. if a grid is contradictory
+// the rules simply stop at the contradiction and the GA handles the rest.
+static void propagate_fixed(GeneMap& map) {
+    map.fixed.assign(map.cell_map.size(), GeneMap::FREE);
+
+    auto force = [&](int gene) {
+        map.fixed[gene] = GeneMap::FORCED;
+        for (int segment : {map.row_segment[gene], map.col_segment[gene]}) {
+            for (int other : map.segment_cells[segment]) {
+                if (map.fixed[other] == GeneMap::FREE) map.fixed[other] = GeneMap::FORBIDDEN;
+            }
+        }
+    };
+
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const NumberedWall& wall : map.numbered_walls) {
+            int forced = 0, free = 0;
+            for (int gene : wall.neighbors) {
+                if (map.fixed[gene] == GeneMap::FORCED) forced++;
+                else if (map.fixed[gene] == GeneMap::FREE) free++;
+            }
+            if (free == 0) continue;
+
+            if (forced >= wall.required) {
+                for (int gene : wall.neighbors) {
+                    if (map.fixed[gene] == GeneMap::FREE) map.fixed[gene] = GeneMap::FORBIDDEN;
+                }
+                changed = true;
+            } else if (forced + free == wall.required) {
+                for (int gene : wall.neighbors) {
+                    if (map.fixed[gene] == GeneMap::FREE) force(gene);
+                }
+                changed = true;
+            }
         }
     }
 }
@@ -130,12 +201,67 @@ GeneMap make_gene_map(const Problem& problem) {
         }
     }
 
+    map.segment_cells.assign(map.num_segments, {});
+    map.gene_walls.assign(map.cell_map.size(), {});
+    for (size_t gene = 0; gene < map.cell_map.size(); gene++) {
+        map.segment_cells[map.row_segment[gene]].push_back(gene);
+        map.segment_cells[map.col_segment[gene]].push_back(gene);
+    }
+    for (size_t w = 0; w < map.numbered_walls.size(); w++) {
+        for (int gene : map.numbered_walls[w].neighbors) map.gene_walls[gene].push_back(w);
+    }
+
+    propagate_fixed(map);
+    for (size_t gene = 0; gene < map.cell_map.size(); gene++) {
+        if (map.fixed[gene] == GeneMap::FREE) map.free_genes.push_back(gene);
+    }
+
     return map;
 }
 
-void mutate_individual(Individual& individual, std::mt19937& rng) {
-    std::uniform_int_distribution<size_t> distribution(0, individual.genes.size() - 1);
-    individual.genes.at(distribution(rng)) ^= 1; // bit flip if the int is 0/1
+void mutate_individual(Individual& individual, const GeneMap& map, std::mt19937& rng) {
+    if (map.free_genes.empty()) return;
+    std::uniform_int_distribution<size_t> distribution(0, map.free_genes.size() - 1);
+    individual.genes[map.free_genes[distribution(rng)]] ^= 1; // bit flip if the int is 0/1
+}
+
+bool fix_wall_mutation(Individual& individual, const GeneMap& map, std::mt19937& rng) {
+    // walls with the wrong count, and how many bulbs each has
+    std::vector<std::pair<int,int>> wrong; // (wall index, bulbs next to it)
+    for (size_t w = 0; w < map.numbered_walls.size(); w++) {
+        int bulbs = 0;
+        for (int gene : map.numbered_walls[w].neighbors) bulbs += individual.genes[gene];
+        if (bulbs != map.numbered_walls[w].required) wrong.emplace_back(w, bulbs);
+    }
+    if (wrong.empty()) return false;
+
+    const auto [w, bulbs] = wrong[std::uniform_int_distribution<size_t>(0, wrong.size() - 1)(rng)];
+    const NumberedWall& wall = map.numbered_walls[w];
+    const bool add = bulbs < wall.required;
+
+    // neighbors we're allowed to change: empty and not FORBIDDEN when adding, bulbs and not FORCED when removing
+    std::vector<int> options;
+    for (int gene : wall.neighbors) {
+        if (add ? (!individual.genes[gene] && map.fixed[gene] != GeneMap::FORBIDDEN)
+                : (individual.genes[gene] && map.fixed[gene] != GeneMap::FORCED)) {
+            options.push_back(gene);
+        }
+    }
+    if (options.empty()) return false;
+    const int gene = options[std::uniform_int_distribution<size_t>(0, options.size() - 1)(rng)];
+
+    if (add) {
+        // clear the bulbs the new one would see, so it doesn't just trade a wall violation for conflicts
+        for (int segment : {map.row_segment[gene], map.col_segment[gene]}) {
+            for (int other : map.segment_cells[segment]) {
+                if (map.fixed[other] != GeneMap::FORCED) individual.genes[other] = 0;
+            }
+        }
+        individual.genes[gene] = 1;
+    } else {
+        individual.genes[gene] = 0;
+    }
+    return true;
 }
 
 std::pair<Individual, Individual> make_children(const std::pair<Individual, Individual>& parents, std::mt19937& rng) {
@@ -178,7 +304,7 @@ Evaluation evaluate(const Individual& individual, const GeneMap& map) {
         }
     }
 
-    Evaluation result{0, 0};
+    Evaluation result{0, 0, 0, 0};
 
     for (size_t gene = 0; gene < num_genes; gene++) {
         int row_bulbs = bulbs_in_segment[map.row_segment[gene]];
@@ -187,7 +313,7 @@ Evaluation evaluate(const Individual& individual, const GeneMap& map) {
         if (individual.genes[gene]) {
             // a bulb sees another bulb if its row or column segment has more than just itself.
             // counted once per bulb, even if it conflicts in both directions (same as the verifier).
-            if (row_bulbs >= 2 || col_bulbs >= 2) result.violations++;
+            if (row_bulbs >= 2 || col_bulbs >= 2) result.bulb_conflicts++;
         } else if (row_bulbs == 0 && col_bulbs == 0) {
             // no bulb anywhere in this cell's row or column segment.
             result.unlit++;
@@ -198,9 +324,10 @@ Evaluation evaluate(const Individual& individual, const GeneMap& map) {
     for (const NumberedWall& wall : map.numbered_walls) {
         int bulbs = 0;
         for (int gene : wall.neighbors) bulbs += individual.genes[gene];
-        if (bulbs != wall.required) result.violations++;
+        if (bulbs != wall.required) result.wall_violations++;
     }
 
+    result.violations = result.bulb_conflicts + result.wall_violations;
     return result;
 }
 
@@ -210,4 +337,79 @@ int64_t compute_fitness(const Individual& individual, const GeneMap& map) {
 
     Evaluation e = evaluate(individual, map);
     return e.violations + unlit_penalty * e.unlit;
+}
+
+static int random_index(size_t size, std::mt19937& rng) {
+    return static_cast<int>(std::uniform_int_distribution<size_t>(0, size - 1)(rng));
+}
+
+Population make_population(const GeneMap& map, int population_size, std::mt19937& rng) {
+    Population population;
+    population.individuals.reserve(population_size);
+    for (int i = 0; i < population_size; i++) {
+        Individual individual = make_individual(map, rng);
+        individual.fitness = compute_fitness(individual, map);
+        population.individuals.push_back(std::move(individual));
+    }
+    return population;
+}
+
+const Individual& tournament_select(const Population& population, int tournament_size, std::mt19937& rng) {
+    const auto& individuals = population.individuals;
+    const Individual* best = &individuals[random_index(individuals.size(), rng)];
+    for (int i = 1; i < tournament_size; i++) {
+        const Individual* challenger = &individuals[random_index(individuals.size(), rng)];
+        if (challenger->fitness < best->fitness) best = challenger;
+    }
+    return *best;
+}
+
+const Individual& best_individual(const Population& population) {
+    return *std::min_element(population.individuals.begin(), population.individuals.end(),
+                             [](const Individual& a, const Individual& b) { return a.fitness < b.fitness; });
+}
+
+Population next_generation(const Population& population, const GeneMap& map,
+                           int tournament_size, double mutation_rate, double wall_mutation_share,
+                           std::mt19937& rng) {
+    const size_t population_size = population.individuals.size();
+
+    Population next;
+    next.individuals.reserve(population_size);
+    next.individuals.push_back(best_individual(population)); // elitism: the best always survives
+
+    // mutate (sometimes), repair, score, and add a child to the next generation
+    auto add_child = [&](Individual& child) {
+        if (next.individuals.size() >= population_size) return;
+        if (std::bernoulli_distribution(mutation_rate)(rng)) {
+            // fall back to a random flip when every wall is already right
+            if (!std::bernoulli_distribution(wall_mutation_share)(rng) || !fix_wall_mutation(child, map, rng)) {
+                mutate_individual(child, map, rng);
+            }
+        }
+        repair_individual(child, map, rng);
+        child.fitness = compute_fitness(child, map);
+        next.individuals.push_back(std::move(child));
+    };
+
+    while (next.individuals.size() < population_size) {
+        const Individual& parent_a = tournament_select(population, tournament_size, rng);
+        const Individual& parent_b = tournament_select(population, tournament_size, rng);
+        auto [child_a, child_b] = make_children({parent_a, parent_b}, rng);
+        add_child(child_a);
+        add_child(child_b);
+    }
+    return next;
+}
+
+Solution individual_to_solution(const Individual& individual, const GeneMap& map, const Problem& problem) {
+    Solution solution;
+    solution.problem = problem;
+    solution.grid = problem.grid;
+    for (size_t gene = 0; gene < individual.genes.size(); gene++) {
+        const auto [row, col] = map.cell_map[gene];
+        if (individual.genes[gene]) solution.grid[row][col] = 'L';
+    }
+    solution.violations = evaluate(individual, map).violations;
+    return solution;
 }
