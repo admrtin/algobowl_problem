@@ -9,7 +9,7 @@ int main() {
     Solver solver;
 
     solver.read();
-    solver.solve(30.0);  // Approximately five seconds of work.
+    solver.solve(30.0);  // Approximately 30 seconds of work.
 
     return 0;
 }
