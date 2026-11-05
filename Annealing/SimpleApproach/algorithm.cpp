@@ -14,7 +14,6 @@
 namespace {
 
 const std::string SKIP_CHARACTERS = "X01234";
-const std::string NUMBERED_WALL = "01234";
 
 constexpr int NUM_DIRECTIONS = 4;
 constexpr int di[NUM_DIRECTIONS] = {-1, 1, 0, 0};
@@ -113,7 +112,7 @@ void Algorithm::output(const char* output_file) {
     std::ofstream out(output_file, std::ios::trunc);
 
     // Complete any remaining gaps before writing the exact verifier score.
-    greedyFill();
+    completeIllumination();
 
     out << getViolations() << '\n';
     for (int i = 0; i < r; i++) {
@@ -166,15 +165,6 @@ void Algorithm::getSegmentData() {
     horizontal_id.assign(r, std::vector<int>(c, -1));
     vertical_id.assign(r, std::vector<int>(c, -1));
     num_wall.assign(r, std::vector<int>(c, 0));
-    num_available.assign(r, std::vector<int>(c, 0));
-    can_bulb.assign(r, std::vector<unsigned char>(c, 0));
-
-    // Initially, every empty cell is a possible bulb location
-    for (int i = 0; i < r; i++) {
-        for (int j = 0; j < c; j++) {
-            can_bulb[i][j] = board[i][j] == '.' && solution[i][j] != 'L';
-        }
-    }
 
     // Get horizontals
     for (int i = 0; i < r; i++) {
@@ -191,9 +181,7 @@ void Algorithm::getSegmentData() {
 
                     for (int k = l; k < j; k++) {
                         horizontal_id[i][k] = id;
-                        // define each cell id as i * c + j + 1 <---- 1-indexation
-                        int cell_id = i * c + k + 1;
-                        horizontals[id].add(i, k, can_bulb[i][k], solution[i][k] == 'L', cell_id);
+                        horizontals[id].add(i, k, solution[i][k] == 'L');
                     }
                 }
                 l = j + 1;
@@ -216,9 +204,7 @@ void Algorithm::getSegmentData() {
 
                     for (int k = l; k < i; k++) {
                         vertical_id[k][j] = id;
-                        // define each cell id as i * c + j + 1 <---- 1-indexation
-                        int cell_id = k * c + j + 1;
-                        verticals[id].add(k, j, can_bulb[k][j], solution[k][j] == 'L', cell_id);
+                        verticals[id].add(k, j, solution[k][j] == 'L');
                     }
                 }
                 l = i + 1;
@@ -226,16 +212,12 @@ void Algorithm::getSegmentData() {
         }
     }
 
-    // Count neighboring bulbs and available candidates for numbered walls
+    // Count neighboring bulbs for numbered walls
     for (int i = 0; i < r; i++) {
         for (int j = 0; j < c; j++) {
-            if (NUMBERED_WALL.find(board[i][j]) == std::string::npos) continue;
-            // If the wall is numbered
+            if (!isNumberedWall(board[i][j])) continue;
             for (auto [x, y] : getAdjacent(i, j)) {
-                // count number of cells satisfying numbered wall
                 num_wall[i][j] += solution[x][y] == 'L';
-                // count the potential number of candidates
-                num_available[i][j] += can_bulb[x][y];
             }
         }
     }
@@ -286,162 +268,19 @@ int Algorithm::affectedScore(int i, int j) {
     return affected;
 }
 
-// Add the wall to the queue
-void Algorithm::enqueueNumberedWall(int i, int j) {
-    if (!propagation_active || !isIn(i, j)) return;
-    if (NUMBERED_WALL.find(board[i][j]) == std::string::npos) return;
-    if (wall_queued[i][j]) return;
-
-    wall_queued[i][j] = 1;
-    numbered_walls.push(i * c + j);
-}
-
-// Add the cell to the queue
-void Algorithm::enqueueGoodCell(int i, int j) {
-    if (!propagation_active || !isIn(i, j)) return;
-    if (horizontal_id[i][j] == -1 || isLit(i, j)) return;
-    if (good_queued[i][j]) return;
-
-    good_queued[i][j] = 1;
-    good_cells.push(i * c + j);
-}
-
-// If a segment has at most one candidate, inspect its cells.
-void Algorithm::enqueueGoodCellsFromSegment(bool horizontal, int id) {
-    const SegmentData& segment = horizontal ? horizontals[id] : verticals[id];
-    if (segment.bulbs > 0 || segment.unknown > 1) return;
-
-    for (auto [i, j] : segment.lst) {
-        if (isLit(i, j)) continue;
-        if (possibleLightCount(i, j) <= 1) {
-            enqueueGoodCell(i, j);
-        }
-    }
-}
-
-// number of candidate bulbs that can illuminate (i, j)
-int Algorithm::possibleLightCount(int i, int j) {
-    int h = horizontal_id[i][j];
-    int v = vertical_id[i][j];
-    if (h == -1 || v == -1) return 0;
-
-    // The cell itself belongs to both segments, so count it only once.
-    return horizontals[h].unknown + verticals[v].unknown - can_bulb[i][j];
-}
-
-// XOR of candidate cell ids in the union of the two segments
-int Algorithm::possibleLightXor(int i, int j) {
-    int h = horizontal_id[i][j];
-    int v = vertical_id[i][j];
-    if (h == -1 || v == -1) return 0;
-
-    int result = horizontals[h].xorCandidates ^ verticals[v].xorCandidates;
-    if (can_bulb[i][j]) result ^= (i * c + j + 1);
-    return result;
-}
-
-// Remove a cell from the set of possible bulb locations.
-void Algorithm::removeCandidate(int i, int j) {
-    if (!can_bulb[i][j]) return;
-
-    int cell_id = i * c + j + 1;
-    int h = horizontal_id[i][j];
-    int v = vertical_id[i][j];
-    int old_h_unknown = horizontals[h].unknown;
-    int old_v_unknown = verticals[v].unknown;
-
-    can_bulb[i][j] = 0;
-    horizontals[h].removeCandidate(cell_id);
-    verticals[v].removeCandidate(cell_id);
-
-    // Update available positions around adjacent numbered walls
-    for (auto [x, y] : getAdjacent(i, j)) {
-        if (NUMBERED_WALL.find(board[x][y]) == std::string::npos) continue;
-        num_available[x][y]--;
-        enqueueNumberedWall(x, y);
-    }
-
-    // A segment only needs to be scanned when its candidate count reaches 1 or 0.
-    if (old_h_unknown > horizontals[h].unknown && horizontals[h].unknown <= 1) {
-        enqueueGoodCellsFromSegment(true, h);
-    }
-    if (old_v_unknown > verticals[v].unknown && verticals[v].unknown <= 1) {
-        enqueueGoodCellsFromSegment(false, v);
-    }
-}
-
-// Restore a cell as a possible bulb location.
-void Algorithm::addCandidate(int i, int j) {
-    if (can_bulb[i][j]) return;
-
-    int cell_id = i * c + j + 1;
-    int h = horizontal_id[i][j];
-    int v = vertical_id[i][j];
-    int old_h_unknown = horizontals[h].unknown;
-    int old_v_unknown = verticals[v].unknown;
-
-    can_bulb[i][j] = 1;
-    horizontals[h].addCandidate(cell_id);
-    verticals[v].addCandidate(cell_id);
-
-    // Update available positions around adjacent numbered walls
-    for (auto [x, y] : getAdjacent(i, j)) {
-        if (NUMBERED_WALL.find(board[x][y]) == std::string::npos) continue;
-        num_available[x][y]++;
-        enqueueNumberedWall(x, y);
-    }
-
-    // Adding a candidate can create a new unique possibility if a segment was empty.
-    if (old_h_unknown == 0 && horizontals[h].bulbs == 0) {
-        enqueueGoodCellsFromSegment(true, h);
-    }
-    if (old_v_unknown == 0 && verticals[v].bulbs == 0) {
-        enqueueGoodCellsFromSegment(false, v);
-    }
-}
-
 // Update the cell state and all segment / numbered-wall counters.
 void Algorithm::changeCell(int i, int j, char ch) {
-    char old_ch = solution[i][j];
-    if (old_ch == ch && can_bulb[i][j] == (ch == '.')) return;
-
-    bool old_bulb = old_ch == 'L';
+    bool old_bulb = solution[i][j] == 'L';
     bool new_bulb = ch == 'L';
-    bool old_candidate = can_bulb[i][j];
-    bool new_candidate = ch == '.';
-
-    int h = horizontal_id[i][j];
-    int v = vertical_id[i][j];
     solution[i][j] = ch;
+    if (old_bulb == new_bulb) return;
 
-    // Update bulb counts first, so a newly occupied segment is not scanned for good cells.
-    if (old_bulb != new_bulb) {
-        int bulb_change = int(new_bulb) - int(old_bulb);
-        horizontals[h].bulbs += bulb_change;
-        verticals[v].bulbs += bulb_change;
+    int bulb_change = int(new_bulb) - int(old_bulb);
+    horizontals[horizontal_id[i][j]].bulbs += bulb_change;
+    verticals[vertical_id[i][j]].bulbs += bulb_change;
 
-        for (auto [x, y] : getAdjacent(i, j)) {
-            if (NUMBERED_WALL.find(board[x][y]) == std::string::npos) continue;
-            num_wall[x][y] += bulb_change;
-            enqueueNumberedWall(x, y);
-        }
-    }
-
-    // Update candidate counts and XORs.
-    if (old_candidate && !new_candidate) {
-        removeCandidate(i, j);
-    } else if (!old_candidate && new_candidate) {
-        addCandidate(i, j);
-    }
-
-    // Removing the last bulb makes the segment unlit again.
-    if (old_bulb && !new_bulb) {
-        if (horizontals[h].bulbs == 0) {
-            enqueueGoodCellsFromSegment(true, h);
-        }
-        if (verticals[v].bulbs == 0) {
-            enqueueGoodCellsFromSegment(false, v);
-        }
+    for (auto [x, y] : getAdjacent(i, j)) {
+        if (isNumberedWall(board[x][y])) num_wall[x][y] += bulb_change;
     }
 }
 
@@ -449,7 +288,7 @@ void Algorithm::changeCell(int i, int j, char ch) {
 int Algorithm::setCell(int i, int j, char ch) {
     if (!isIn(i, j) || horizontal_id[i][j] == -1) return score;
     if (ch != '.' && ch != 'L') return score;
-    if (solution[i][j] == ch && can_bulb[i][j] == (ch == '.')) return score;
+    if (solution[i][j] == ch) return score;
 
     int before = affectedScore(i, j);
     changeCell(i, j, ch);
@@ -459,157 +298,13 @@ int Algorithm::setCell(int i, int j, char ch) {
     return score;
 }
 
-// Place a bulb, then remove every other candidate in its horizontal and vertical segments.
-bool Algorithm::placeBulb(int i, int j) {
-    if (solution[i][j] == 'L') return true;
-    if (!can_bulb[i][j]) return false;
-    if (isLit(i, j)) return false;
-
-    setCell(i, j, 'L');
-
-    // No other bulb can be placed in the same horizontal segment.
-    int h = horizontal_id[i][j];
-    for (auto [x, y] : horizontals[h].lst) {
-        if (can_bulb[x][y]) removeCandidate(x, y);
-    }
-
-    // No other bulb can be placed in the same vertical segment.
-    int v = vertical_id[i][j];
-    for (auto [x, y] : verticals[v].lst) {
-        if (can_bulb[x][y]) removeCandidate(x, y);
-    }
-
-    return true;
-}
-
-//============================= PART1 =============================//
-// Place a bulb in every cell that is not already illuminated.
-// An unlit cell has no bulb in either of its two segments, so this cannot
-// introduce a row/column bulb conflict.
-void Algorithm::greedyFill() {
-    propagation_active = false;
-
+// Light every remaining dark cell, since the verifier rejects any dark cell.
+// A dark cell has no bulb in either of its two segments, so this cannot create a conflict.
+void Algorithm::completeIllumination() {
     for (int i = 0; i < r; i++) {
         for (int j = 0; j < c; j++) {
-            if (horizontal_id[i][j] == -1 || isLit(i, j)) continue;
-
-            // Deterministic deductions may have removed this candidate.
-            if (!can_bulb[i][j]) addCandidate(i, j);
-            placeBulb(i, j);
+            if (horizontal_id[i][j] != -1 && !isLit(i, j)) setCell(i, j, 'L');
         }
-    }
-}
-
-//------------------------ Deterministic Algorithm ------------------//
-// Queue-based propagation:
-// 1. Numbered walls force bulbs / eliminate candidates.
-// 2. When a segment reaches 1 or 0 candidates, inspect its cells.
-// 3. An unlit cell with exactly one possible bulb forces that bulb.
-void Algorithm::deterministicFill() {
-    initializePropagation();
-    processPropagation();
-
-    propagation_active = false;
-    getSegmentData();
-}
-
-// Initialize queues and check all constraints that may already be forced.
-void Algorithm::initializePropagation() {
-    good_cells = std::queue<int>();
-    numbered_walls = std::queue<int>();
-    good_queued.assign(r, std::vector<unsigned char>(c, 0));
-    wall_queued.assign(r, std::vector<unsigned char>(c, 0));
-    propagation_active = true;
-
-    // Existing bulbs already occupy their segments; remove other candidates there.
-    for (int id = 0; id < int(horizontals.size()); id++) {
-        if (horizontals[id].bulbs == 0) continue;
-        for (auto [i, j] : horizontals[id].lst) {
-            if (can_bulb[i][j]) removeCandidate(i, j);
-        }
-    }
-    for (int id = 0; id < int(verticals.size()); id++) {
-        if (verticals[id].bulbs == 0) continue;
-        for (auto [i, j] : verticals[id].lst) {
-            if (can_bulb[i][j]) removeCandidate(i, j);
-        }
-    }
-
-    // Every numbered wall is checked once at the beginning.
-    for (int i = 0; i < r; i++) {
-        for (int j = 0; j < c; j++) {
-            enqueueNumberedWall(i, j);
-        }
-    }
-
-    // Check segments that already have at most one candidate.
-    for (int id = 0; id < int(horizontals.size()); id++) {
-        enqueueGoodCellsFromSegment(true, id);
-    }
-    for (int id = 0; id < int(verticals.size()); id++) {
-        enqueueGoodCellsFromSegment(false, id);
-    }
-}
-
-// Process numbered-wall and good-cell queues until no forced move remains.
-void Algorithm::processPropagation() {
-    while (!numbered_walls.empty() || !good_cells.empty()) {
-        // Process numbered walls first; they have at most four adjacent cells.
-        if (!numbered_walls.empty()) {
-            int wall_id = numbered_walls.front();
-            numbered_walls.pop();
-
-            int i = wall_id / c;
-            int j = wall_id % c;
-            wall_queued[i][j] = 0;
-
-            int needed = board[i][j] - '0';
-            int required = needed - num_wall[i][j];
-            int available = num_available[i][j];
-
-            // This constraint is currently impossible to satisfy. Leave it unchanged.
-            if (required < 0 || required > available) continue;
-
-            if (required == 0) {
-                // No more bulbs are needed around this wall.
-                for (auto [x, y] : getAdjacent(i, j)) {
-                    if (can_bulb[x][y]) removeCandidate(x, y);
-                }
-            } else if (required == available) {
-                // Every remaining candidate around this wall must be a bulb.
-                for (auto [x, y] : getAdjacent(i, j)) {
-                    if (!can_bulb[x][y]) continue;
-                    // If this placement conflicts with an existing bulb, skip it.
-                    placeBulb(x, y);
-                }
-            }
-            continue;
-        }
-
-        // Process a cell that may have exactly one possible illuminating bulb.
-        int cell_id = good_cells.front();
-        good_cells.pop();
-
-        int i = cell_id / c;
-        int j = cell_id % c;
-        good_queued[i][j] = 0;
-
-        if (isLit(i, j)) continue;
-
-        int possible = possibleLightCount(i, j);
-        // No candidate can illuminate this cell. Leave it unresolved.
-        if (possible == 0) continue;
-        if (possible != 1) continue;
-
-        // The XOR of the union contains the id of the only remaining candidate.
-        int candidate_id = possibleLightXor(i, j) - 1;
-        if (candidate_id < 0 || candidate_id >= r * c) continue;
-
-        int x = candidate_id / c;
-        int y = candidate_id % c;
-        if (!can_bulb[x][y]) continue;
-        // If the forced placement is no longer valid, skip it and keep processing.
-        placeBulb(x, y);
     }
 }
 
@@ -618,7 +313,6 @@ void Algorithm::processPropagation() {
 // every floor cell may receive a bulb.
 
 void Algorithm::annealingFill() {
-    propagation_active = false;
 
     std::vector<int> open_cells, numbered_cells;
     std::vector<unsigned char> near_wall(r * c, 0);
@@ -657,7 +351,6 @@ void Algorithm::annealingFill() {
         threads.emplace_back([&, t]() {
             // Each worker owns its own board, segments, score, and RNG.
             Algorithm worker = *this;
-            worker.propagation_active = false;
 
             std::seed_seq seed(seeds[t].begin(), seeds[t].end());
             std::mt19937 rng(seed);
@@ -667,7 +360,7 @@ void Algorithm::annealingFill() {
                 return std::uniform_int_distribution<int>(0, limit - 1)(rng);
             };
 
-            // Use different starting boards instead of repeating the same greedy solution.
+            // Use different starting boards so the workers explore different solutions.
             if (t > 0) {
                 if (t % 3 == 0) {
                     // Start from scratch for some workers.
@@ -860,7 +553,7 @@ void Algorithm::annealingFill() {
 
             worker.solution = best_solution;
             worker.getSegmentData();
-            worker.greedyFill();
+            worker.completeIllumination();
             int final_violations = worker.getViolations();
             results[t] = {final_violations, worker.solution};
         });
@@ -1109,7 +802,6 @@ void Algorithm::fixCell() {
 
 void Algorithm::windowFill() {
     using Clock = std::chrono::steady_clock;
-    propagation_active = false;
     if (Clock::now() >= deadline - std::chrono::seconds(3)) return;
 
     // LNS needs a conflict-free, fully illuminated initial configuration.
@@ -1128,28 +820,43 @@ void Algorithm::windowFill() {
             if (horizontals[h].bulbs > 1 || verticals[v].bulbs > 1) setCell(i, j, '.');
         }
     }
-    greedyFill();
+    completeIllumination();
     getSegmentData();
 
     int stagnant_rounds = 0;
     for (int round = 0; round < MAX_LNS_ROUNDS; round++) {
-        if (Clock::now() >= deadline - std::chrono::seconds(3)) break;
+        auto remaining = std::chrono::duration_cast<std::chrono::seconds>(
+            deadline - Clock::now()
+        ).count();
+
+        if (remaining <= 3) {
+            std::cout << "LNS stopped: time limit reached\n";
+            break;
+        }
+
+        std::cout << "LNS round " << round + 1
+                << " started, remaining time: "
+                << remaining << " seconds\n";
+
         int before = getViolations();
         if (before == 0) break;
+
         fixCell();
+
         int after = getViolations();
-        std::cout << "LNS round " << round + 1 << ": " << after << " violations\n";
+
+        std::cout << "LNS round " << round + 1
+                << ": " << after << " violations\n";
+
         if (after >= before) {
-            // One empty randomized pass is not proof that no improvement exists.
-            if (++stagnant_rounds >= 2) break;
+            if (++stagnant_rounds >= 2) {
+                std::cout << "LNS stopped: no improvement in 2 rounds\n";
+                break;
+            }
         } else {
             stagnant_rounds = 0;
         }
     }
-
-    // If the repair did not beat our original, restore it.
-    if (previous_valid && getViolations() > previous_violations) solution = previous;
-    getSegmentData();
 }
 
 //========================= HELPER FUNCTIONS ========================//

@@ -1,0 +1,66 @@
+#include "algorithm.h"
+
+#include <chrono>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <string>
+
+
+// run:
+// g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread main.cpp algorithm.cpp -o algorithm
+int main() {
+    int group, option;
+    std::cout << "Enter input group: ";
+    if (!(std::cin >> group)) return 1;
+
+    std::cout << "\nChoose algorithms to run:\n"
+              << "1. Annealing\n"
+              << "2. Window (LNS)\n"
+              << "3. Annealing + Window (LNS)\n"
+              << "\nEnter option (1-3): ";
+    if (!(std::cin >> option) || option < 1 || option > 3) return 1;
+
+    std::string input_file = "../../TeamsInputs/input_group" + std::to_string(group) + ".txt";
+    std::string out_file = "output_group" + std::to_string(group) + ".txt";
+    std::string best_file = "../../TeamsOutputs/output_group" + std::to_string(group) + ".txt";
+
+    // best_file = 'X';
+
+    constexpr int ANNEALING_TIME = 140;
+    constexpr int LNS_TIME = 160;
+    constexpr int RESERVED_TIME = 5;
+    
+    using Clock = std::chrono::steady_clock;
+    auto start = Clock::now();
+    auto stop = start + std::chrono::seconds(
+        ANNEALING_TIME + LNS_TIME - RESERVED_TIME
+    );
+
+    auto anneal_stop = option == 3 ? start + std::chrono::seconds(ANNEALING_TIME) : stop;
+
+    Algorithm algorithm(input_file.c_str());
+    algorithm.setDeadlines(anneal_stop, stop);
+
+    algorithm.loadSolution(best_file.c_str());
+
+    if (option & 1) {
+        std::cout << "Annealing (24 threads)...\n" << std::flush;
+        algorithm.annealingFill();
+    }
+    if (option & 2) {
+        std::cout << "Window repair (LNS)...\n" << std::flush;
+        algorithm.windowFill();
+    }
+    algorithm.output(out_file.c_str());
+
+    int found_violations = -1, best_violations = -1;
+    std::ifstream found_input(out_file), best_input(best_file);
+    found_input >> found_violations;
+    best_input >> best_violations;
+    std::cout << "\nFOUND_NUMBER_OF_VIOLATIONS = " << found_violations << '\n';
+    if (best_input) std::cout << "BEST_FOUND_NUMBER_OF_VIOLATION = " << best_violations << '\n';
+
+    std::string command = "../../Verifier/verifier \"" + input_file + "\" \"" + out_file + "\"";
+    return std::system(command.c_str()) == 0 ? 0 : 1;
+}

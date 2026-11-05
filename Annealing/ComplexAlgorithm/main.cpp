@@ -6,6 +6,9 @@
 #include <iostream>
 #include <string>
 
+
+// run:
+// g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread main.cpp algorithm.cpp -o algorithm
 int main() {
     int group, option;
     std::cout << "Enter input group: ";
@@ -29,18 +32,23 @@ int main() {
     std::cout << "\nEnter option (0-15): ";
     if (!(std::cin >> option) || option < 0 || option > 15) return 1;
 
-    std::string input_file = "../TeamsInputs/input_group" + std::to_string(group) + ".txt";
+    std::string input_file = "../../TeamsInputs/input_group" + std::to_string(group) + ".txt";
     std::string out_file = "output_group" + std::to_string(group) + ".txt";
-    std::string best_file = "../TeamsOutputs/output_group" + std::to_string(group) + ".txt";
+    std::string best_file = "../../TeamsOutputs/output_group" + std::to_string(group) + ".txt";
 
     // best_file = 'X';
 
-    constexpr int ANNEALING_TIME = 20;
-    constexpr int LNS_TIME = 40;
+    constexpr int ANNEALING_TIME = 140;
+    constexpr int LNS_TIME = 160;
+    constexpr int RESERVED_TIME = 5;
+
     using Clock = std::chrono::steady_clock;
     auto start = Clock::now();
-    auto stop = start + std::chrono::seconds(ANNEALING_TIME - 5); // 5 seconds reserved for output and verifier
-    auto anneal_stop = (option & 4) && (option & 8) ? start + std::chrono::seconds(LNS_TIME) : stop;
+    auto stop = start + std::chrono::seconds(
+        ANNEALING_TIME + LNS_TIME - RESERVED_TIME
+    );
+
+    auto anneal_stop = (option & 4) && (option & 8) ? start + std::chrono::seconds(ANNEALING_TIME) : stop;
 
     Algorithm algorithm(input_file.c_str());
     algorithm.setDeadlines(anneal_stop, stop);
