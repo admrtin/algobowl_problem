@@ -33,8 +33,8 @@ int main() {
     std::string out_file = "output_group" + std::to_string(group) + ".txt";
     std::string best_file = "../TeamsOutputs/output_" + std::to_string(group) + ".txt";
 
-    constexpr int ANNEALING_TIME = 300;
-    constexpr int LNS_TIME = 140;
+    constexpr int ANNEALING_TIME = 60;
+    constexpr int LNS_TIME = 60;
     using Clock = std::chrono::steady_clock;
     auto start = Clock::now();
     auto stop = start + std::chrono::seconds(ANNEALING_TIME - 5); // 5 seconds reserved for output and verifier
