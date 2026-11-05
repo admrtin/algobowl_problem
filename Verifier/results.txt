@@ -1,0 +1,46 @@
+==> Compiling verifier.cpp
+==> Input: /mnt/c/Users/DellKnow/Desktop/My/Public Life/Education/Universities/Colorado School Of Mines/Fall26/CSCI406. Algorithms/AlgorithmsProjects/AlgoBOWL/TeamsInputs/input_group1294.txt
+==> Outputs: ../TeamsVerification
+
+RESULT   VIOLATIONS    OUTPUT                                        VERIFIER SAYS
+------------------------------------------------------------------------------------------------------
+PASS     5615          output_from_1293_to_1294.txt                  OUTPUT is good
+PASS     0             output_from_1294_to_1294.txt                  OUTPUT is good
+PASS     1671          output_from_1295_to_1294.txt                  OUTPUT is good
+PASS     1057          output_from_1296_to_1294.txt                  OUTPUT is good
+PASS     1692          output_from_1297_to_1294.txt                  OUTPUT is good
+PASS     210           output_from_1298_to_1294.txt                  OUTPUT is good
+PASS     653           output_from_1299_to_1294.txt                  OUTPUT is good
+PASS     4460          output_from_1300_to_1294.txt                  OUTPUT is good
+PASS     4211          output_from_1301_to_1294.txt                  OUTPUT is good
+FAIL     -             output_from_1302_to_1294.txt                  ERROR: cell (1, 1) is not illuminated
+PASS     5231          output_from_1303_to_1294.txt                  OUTPUT is good
+FAIL     -             output_from_1304_to_1294.txt                  ERROR: wrong number of violations reported: 1915 reported, 2735 actual
+PASS     2327          output_from_1305_to_1294.txt                  OUTPUT is good
+PASS     814           output_from_1306_to_1294.txt                  OUTPUT is good
+PASS     2048          output_from_1307_to_1294.txt                  OUTPUT is good
+PASS     9             output_from_1308_to_1294.txt                  OUTPUT is good
+PASS     263           output_from_1309_to_1294.txt                  OUTPUT is good
+PASS     430           output_from_1310_to_1294.txt                  OUTPUT is good
+PASS     4649          output_from_1311_to_1294.txt                  OUTPUT is good
+PASS     4888          output_from_1312_to_1294.txt                  OUTPUT is good
+PASS     4846          output_from_1313_to_1294.txt                  OUTPUT is good
+PASS     5573          output_from_1314_to_1294.txt                  OUTPUT is good
+PASS     73            output_from_1315_to_1294.txt                  OUTPUT is good
+PASS     3544          output_from_1316_to_1294.txt                  OUTPUT is good
+PASS     3069          output_from_1317_to_1294.txt                  OUTPUT is good
+PASS     1341          output_from_1318_to_1294.txt                  OUTPUT is good
+PASS     1327          output_from_1319_to_1294.txt                  OUTPUT is good
+PASS     6745          output_from_1320_to_1294.txt                  OUTPUT is good
+FAIL     -             output_from_1321_to_1294.txt                  ERROR: wrong number of violations reported: 17566 reported, 5006 actual
+PASS     3022          output_from_1322_to_1294.txt                  OUTPUT is good
+PASS     1714          output_from_1323_to_1294.txt                  OUTPUT is good
+PASS     5743          output_from_1324_to_1294.txt                  OUTPUT is good
+PASS     2688          output_from_1325_to_1294.txt                  OUTPUT is good
+PASS     862           output_from_1326_to_1294.txt                  OUTPUT is good
+PASS     1112          output_from_1359_to_1294.txt                  OUTPUT is good
+PASS     2330          output_from_1392_to_1294.txt                  OUTPUT is good
+
+------------------------------------------------------------------------------------------------------
+33/36 outputs passed; 3/36 failed
+BEST VALID SOLUTION: output_from_1294_to_1294.txt (0 violations)
