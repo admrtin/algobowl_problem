@@ -35,7 +35,7 @@ constexpr double FINAL_TEMPERATURE = 0.10;                  // final search temp
 constexpr int MAX_WINDOW_SIZE = 29;                     // max square window nxn                     
 constexpr int MAX_VISITED_NODES = 200'000;                // max nodes in one dfs tree of nodes
 
-constexpr int MAX_LNS_ROUNDS = 30;                       // the number of times to run LNS
+constexpr int MAX_LNS_ROUNDS = 100;                       // the number of times to run LNS
 
 // constructor takes the input_file to read
 Algorithm::Algorithm(const char* input_file) {
